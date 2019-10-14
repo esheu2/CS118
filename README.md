@@ -1,4 +1,4 @@
-# CS118 - Computer Network Fundamentals
+# CS 118 - Computer Network Fundamentals
 Fall 2019
 
 Professor: Varghese, George
