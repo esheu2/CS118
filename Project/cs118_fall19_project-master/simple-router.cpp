@@ -39,6 +39,79 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
 
   // FILL THIS IN
 
+  //mac address stuff
+  std::string iface_address = macToString(iface->addr);
+  std::string packet_address = macToString(packet);
+
+  std::string broadcast_address = "FF:FF:FF:FF:FF:FF";
+  std:: string lower_broadcast_address = "ff:ff:ff:ff:ff:ff";
+
+  //ignoring condition: if packet not destined for the router
+  if((broadcast_address != packet_address) &&
+    (lower_broadcast_address != packet_address) &&
+    (iface_address != packet_address))
+    {
+      std::cerr << "Received packet, but address does not correspond to interface address or broadcast address. Packet ignored." << std::endl;
+      return;
+    }
+
+    uint16_t ether_type = ethertype(packet.data());
+
+    if(ether_type == ethertype_arp)
+    {
+      std::cerr << "Packet is type ARP." << std::endl;
+      const arp_hdr *arp_header = reinterpret_cast<const arp_hdr*>(packet.data() + sizeof(ethernet_hdr));
+      uint32_t arp_target_ip = arp_header->arp_tip;
+
+      //find the arp op code and handle it (if it is a request or reply)
+      uint16_t arp_operation = ntohs(arp_header->arp_op);
+      if(arp_operation == arp_op_request)
+      {
+        std::cerr << "Handle ARP request" << std::endl;
+
+        //if target and interface IP do not match, drop req
+        if(arp_target_ip != iface->ip)
+        {
+          std::cerr << "The target IP address does not match the interface IP address. Ignoring request." << std::endl;
+          return;
+        }
+
+        //otherwise respond to arp req
+        //check arp cache for the corresponding MAC address
+        //if found, proceed with handling the IP packet
+        //otherwise, router should queue the received packet and
+        //start sending  ARP request to discover the IP-MAC mapping
+        std::shared_ptr<ArpEntry> entry = m_arp.lookup(arp_target_ip);
+        if(entry != NULL)
+        {
+          std::cerr << "The ARP packet is sent" << std::endl;
+          sendPacket(packet, macToString(entry->mac));
+        }
+        //if not in cache, broadcast
+        else
+        {
+          std::cerr << "ARP Requesting for IP-MAC mapping" << std::endl;
+          std::shared_ptr<ArpRequest> request = queueRequest(arp_target_ip, packet, inIface);
+
+        }
+
+      }
+      else if(arp_operation == arp_op_reply)
+      {
+
+      }
+
+    }
+    else if(ether_type == ethertype_ip)
+    {
+      std::cerr << "Packet is type IP." << std::endl;
+    }
+    else
+    {
+      std::cerr << "Packet is neither an ARP or IP type. Packet ignored" << std::endl;
+      return;
+    }
+
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
