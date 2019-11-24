@@ -26,8 +26,6 @@
    function handle_arpreq(req):
        if now - req->timeSent > seconds(1)
            if req->nTimesSent >= 5:
-               send icmp host unreachable to source addr of all pkts waiting
-                 on this request
                cache.removeRequest(req)
            else:
                send arp request
@@ -49,8 +47,8 @@
    --
 
    To meet the guidelines in the assignment (ARP requests are sent every second
-   until we send 5 ARP requests, then we send ICMP host unreachable back to
-   all packets waiting on this ARP request), you must fill out the following
+   until we send 5 ARP requests, then remove the corresponding arp request), 
+   you must fill out the following
    function that is called every second and is defined in sr_arpcache.c:
 
    void
