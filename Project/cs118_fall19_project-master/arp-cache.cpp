@@ -30,8 +30,70 @@ namespace simple_router {
 void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
-
   // FILL THIS IN
+  auto now = steady_clock::now();
+
+  //iterate thru cache entries. remove stale (invalid) ARP information
+  for(std::list<std::shared_ptr<ArpEntry>>::iterator cache_entry_iter = m_cacheEntries.begin(); cache_entry_iter != m_cacheEntries.end();)
+  {
+    if((*cache_entry_iter)->isValid) cache_entry_iter++;
+    else cache_entry_iter = m_cacheEntries.erase(cache_entry_iter);
+  }
+
+  //keep retransmitting arp req until it gets a reply or has already retransmitted >= 5 times
+  for (std::list<std::shared_ptr<ArpRequest>>::iterator req_iter = m_arpRequests.begin(); req_iter != m_arpRequests.end();)
+  {
+    if((*req_iter)->nTimesSent < MAX_SENT_TIME)
+    {
+      // Create and send ARP Request
+      ethernet_hdr req_eth_hdr;
+      arp_hdr req_arp_hdr;
+
+      //find iface
+      std::string interface_name = (*req_iter)->packets.front().iface;
+      const Interface* iface = m_router.findIfaceByName(interface_name);
+
+      //Populating the req ethernet header
+      memset(req_eth_hdr.ether_dhost, 0xFF, ETHER_ADDR_LEN);
+      memcpy(req_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+      req_eth_hdr.ether_type = htons(ethertype_arp);
+
+      //Populating the req arp header
+      req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
+      req_arp_hdr.arp_pro = htons(ethertype_ip);
+      req_arp_hdr.arp_hln = ETHER_ADDR_LEN;
+      req_arp_hdr.arp_pln = 4;
+      req_arp_hdr.arp_op = htons(arp_op_request);
+      memcpy(req_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
+      req_arp_hdr.arp_sip = iface->ip;
+      memset(req_arp_hdr.arp_tha, 0xFF, ETHER_ADDR_LEN);
+      req_arp_hdr.arp_tip = (*req_iter)->ip;
+
+      //populate buffer
+      Buffer packet_buff(sizeof(ethernet_hdr) + sizeof(arp_hdr));
+      memcpy(packet_buff.data(), &req_eth_hdr, sizeof(ethernet_hdr));
+      memcpy(packet_buff.data() + sizeof(ethernet_hdr), &req_arp_hdr, sizeof(arp_hdr));
+      //send reply
+      m_router.sendPacket(packet_buff, interface_name);
+      std::cerr << "Sent an ARP Request" << std::endl;
+
+      //update request information
+      (*req_iter)->timeSent = now;
+      (*req_iter)->nTimesSent++;
+      req_iter++;
+    }
+    else
+    {
+      /*for(std::list<PendingPacket>::const_iterator packet_iter = (*req_iter)->packets.begin(); packet_iter != (*req_iter)->packets.end();)
+      {
+        //drop all packets associated with request
+        packet_iter = (*req_iter)->packets.erase(packet_iter);
+      }*/
+
+      //remove request
+      req_iter = m_arpRequests.erase(req_iter);
+    }
+  }
 
 }
 //////////////////////////////////////////////////////////////////////////
