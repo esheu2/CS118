@@ -162,25 +162,6 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
         return;
       }
 
-      //check if TTL is 0
-      if(ip_header->ip_ttl == 0)
-      {
-        std::cerr << "Time to Live is 0. Dropping" << std::endl;
-        return;
-      }
-
-      //check if TTL is greater than 0
-      std::cerr << "Decrementing TTL" << std::endl;
-      ip_header->ip_ttl--;
-      if(ip_header->ip_ttl <= 0)
-      {
-        std::cerr << "Time to Live is 0. Dropping" << std::endl;
-        return;
-      }
-
-      //recompute checksum for the hop
-      ip_header->ip_sum = cksum(ip_header, sizeof(ip_hdr));
-
       //check all interfaces to see if destined for router
       std::cerr << "Checking all interfaces to see if destined for router" << std::endl;
       for(std::set<Interface>::iterator iface_iter = m_ifaces.begin(); iface_iter != m_ifaces.end(); iface_iter++)
@@ -235,6 +216,7 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
               reply_ip_hdr.ip_dst = ip_header->ip_src;
               //calculate and update the ip checksum
               reply_ip_hdr.ip_sum = cksum(&reply_ip_hdr, sizeof(ip_hdr));
+              reply_ip_hdr.ip_ttl = 64;
               memcpy(packet_buff.data() + sizeof(ethernet_hdr), &reply_ip_hdr, sizeof(ip_hdr));
 
               //populating the icmp header
@@ -255,6 +237,25 @@ SimpleRouter::handlePacket(const Buffer& packet, const std::string& inIface)
           }
         }
       }
+
+      //check if TTL is 0
+      if(ip_header->ip_ttl == 0)
+      {
+        std::cerr << "Time to Live is 0. Dropping" << std::endl;
+        return;
+      }
+
+      //check if TTL is greater than 0
+      std::cerr << "Decrementing TTL" << std::endl;
+      ip_header->ip_ttl--;
+      if(ip_header->ip_ttl <= 0)
+      {
+        std::cerr << "Time to Live is 0. Dropping" << std::endl;
+        return;
+      }
+
+      //recompute checksum for the hop
+      ip_header->ip_sum = cksum(ip_header, sizeof(ip_hdr));
 
       std::cerr << "Checking routing table" << std::endl;
       //Use longest matching prefix algorithm to forward packets to next hop
